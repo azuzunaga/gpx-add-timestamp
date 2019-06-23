@@ -1,10 +1,5 @@
 import gpxpy
-import matplotlib.pyplot as plt
-import datetime
-from math import sqrt, floor
-import numpy as np
 import pandas as pd
-import random
 
 import tkinter as tk
 from tkinter import filedialog
@@ -24,29 +19,31 @@ gpx = gpxpy.parse(gpx_file)
 # Create a dataframe with the GPX data
 data = gpx.tracks[0].segments[0].points
 
-df = pd.DataFrame(columns=['lon', 'lat', 'alt', 'time'])
+df = pd.DataFrame(columns=['lon', 'lat', 'alt', 'time', 'ele_change'])
 
-for point in data:
+# Get the climbing stats while creating the dataframe
+climbing_stats = {'asc': 0, 'desc': 0, 'flat': 0}
+
+for index, point in enumerate(data, start=0):
+    climb_delta = point.elevation - data[index - 1].elevation
+    if climb_delta > 0:
+        climbing_stats['asc'] += 1
+        ele_change = 'asc'
+    elif climb_delta < 0:
+        climbing_stats['desc'] += 1
+        ele_change = 'desc'
+    else:
+        climbing_stats['flat'] += 1
+        ele_change = 'flat'
+
     df = df.append({'lon': point.longitude, 'lat': point.latitude,
-                    'alt': point.elevation, 'time': point.time}, ignore_index=True)
+                    'alt': point.elevation, 'time': point.time,
+                    'ele_change': ele_change}, ignore_index=True)
 
 # Calculate total time, time per coordinate, and total points
 total_points = len(df)
 total_time = df.iloc[-1].time - df.iloc[0].time
 timedelta = (df.iloc[-1].time - df.iloc[0].time) / total_points
-
-# Calculate feet ascending, feet descending, and feet flat
-climbing_stats = {'asc': 0, 'desc': 0, 'flat': 0}
-for i, j in df.iterrows():
-    if i == 0:
-        climbing_stats['flat'] += 1
-    ele_change = j.alt - df.iat[i - 1, 2]
-    if ele_change > 0:
-        climbing_stats['asc'] += 1
-    elif ele_change < 0:
-        climbing_stats['desc'] += 1
-    else:
-        climbing_stats['flat'] += 1
 
 # Figure out ascent and descent rates
 desc_rate = (total_points -
@@ -57,15 +54,15 @@ asc_rate = climbing_stats['desc'] / climbing_stats['asc'] * desc_rate
 for i, j in df.iterrows():
     if i == 0 or i == len(df) - 1:
         continue
-    ele_change = j.alt - df.iat[i - 1, 2]
-    if ele_change > 0:
+    ele_change = j.ele_change
+    if ele_change == 'asc':
         time_step = timedelta * asc_rate
-    elif ele_change < 0:
+    elif ele_change == 'desc':
         time_step = timedelta * desc_rate
     else:
         time_step = timedelta
 
-    df.iat[i, -1] = df.iat[i - 1, -1] + time_step
+    df.iat[i, -2] = df.iat[i - 1, -2] + time_step
 
 # Create a new GPX file with time data
 new_gpx = gpxpy.gpx.GPX()
