@@ -1,8 +1,14 @@
+import os
 import gpxpy
+import gmplot
 import pandas as pd
-
 import tkinter as tk
 from tkinter import filedialog
+from dotenv import load_dotenv
+
+# Get Google Maps API key
+load_dotenv()
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 
 # Open file using system dialog
 root = tk.Tk()
@@ -78,3 +84,21 @@ gpx_track.segments.append(gpx_segment)
 for _, j in df.iterrows():
     gpx_segment.points.append(gpxpy.gpx.GPXTrackPoint(
         j.lat, j.lon, elevation=j.alt, time=j.time))
+
+# Plot the data
+# Get the center of the map
+min_lat, max_lat, min_lon, max_lon = \
+    min(df['lat']), max(df['lat']), min(df['lon']), max(df['lon'])
+
+center_lat, center_lon = \
+    min_lat + (max_lat - min_lat) / 2, min_lon + (max_lon - min_lon) / 2,
+
+# Create an empty map with zoom level 14
+google_map = gmplot.GoogleMapPlotter(
+    center_lat, center_lon, 13, GOOGLE_MAPS_API_KEY
+)
+
+# Add the data to the map
+google_map.plot(df['lat'], df['lon'], '#FB051D', edge_width=2)
+
+google_map.draw('google_map.html')
